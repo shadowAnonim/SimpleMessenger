@@ -13,14 +13,21 @@ namespace SimpleMessengerApi
     public class Messenger
     {
         private static string token;
-        private TelegramBotClient client;
-        private SimpleMessengerDbEntities db = new SimpleMessengerDbEntities();
+        private static TelegramBotClient client;
+        private static SimpleMessengerDbEntities db = new SimpleMessengerDbEntities();
+
         public Messenger()
         {
             token = File.ReadAllText(@"D:\\SimpleMessengerToken.txt");
             client = new TelegramBotClient(token);
             client.OnMessage += Client_OnMessage;
             client.StartReceiving();
+        }
+
+        public static void Send(long id, string text)
+        {
+            client.SendTextMessageAsync(id, text);
+            return;
         }
 
         private void Client_OnMessage(object sender, Telegram.Bot.Args.MessageEventArgs e)
@@ -34,6 +41,7 @@ namespace SimpleMessengerApi
                 {
                     db.User.Add(new User() { Id = id });
                     db.SaveChanges();
+                    user = db.User.FirstOrDefault(u => u.Id == id);
                 }
             }
             catch (Exception ex)
@@ -51,20 +59,30 @@ namespace SimpleMessengerApi
             if (text == "/start")
             {
                 client.SendTextMessageAsync(id, "Добро пожаловать в сервис <b>SimpleMessenger</b>\n\n" +
-                    "Чтобы отправить сообщение введите тескт в формате:\n" +
+                    "Чтобы привязать устройство к аккаунту введите номер устройства\n\n" +
+                    "Чтобы отправить сообщение введите текст в формате:\n" +
                     "<i>НомерУстройства Сообщение</i>\n\n" +
                     "Например:\n" +
-                    "<i>1 Привет!</i>\n\n" + 
+                    "<i>1 Привет!</i>\n\n" +
+                    "Чтобы удалить свои сообщения введите текст в формате:\n" +
+                    "<i>НомерУстройства</i> clear\n\n" +
+                    "Например:\n" +
+                    "<i>1 clear</i>\n\n" +
                     "Для справки введите: /help", parseMode: ParseMode.Html);
                 return;
             }
             else if (text == "/help")
             {
                 client.SendTextMessageAsync(id,
+                    "Чтобы привязать устройство к аккаунту введите номер устройства\n\n" +
                     "Чтобы отправить сообщение введите тескт в формате:\n" +
                     "<i>НомерУстройства Сообщение</i>\n\n" +
                     "Например:\n" +
-                    "<i>1 Привет!</i>", parseMode: ParseMode.Html);
+                    "<i>1 Привет!</i>\n\n" +
+                    "Чтобы удалить свои сообщения введите текст в формате:\n" +
+                    "<i>НомерУстройства</i> clear\n\n" +
+                    "Например:\n" +
+                    "<i>1 clear</i>\n\n", parseMode: ParseMode.Html);
                 return;
             }
             string[] splittedText = text.Split(' ');
@@ -119,6 +137,17 @@ namespace SimpleMessengerApi
                         $" так как не привязаны к нему\n\n" +
                             $"Чтобы привязать аккаунт к устройству введите его номер", parseMode: ParseMode.Html);
                     return;
+                }
+                if (splittedText.Length == 2)
+                {
+                    if (splittedText[1].ToLower() == "clear")
+                    {
+                        db.Message.RemoveRange(db.Message.Where(m => m.UserId == id && m.DeviceId == i));
+                        db.SaveChanges();
+                        client.SendTextMessageAsync(id, $"Переписка с устройством №{i} удалена"
+                        , parseMode: ParseMode.Html);
+                        return;
+                    }
                 }
                 db.Message.Add(new Message { DeviceId = i, Text = String.Join(" ", splittedText.Skip(1)), UserId = id });
                 db.SaveChanges();

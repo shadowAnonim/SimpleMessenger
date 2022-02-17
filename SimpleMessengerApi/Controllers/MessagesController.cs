@@ -24,9 +24,19 @@ namespace SimpleMessengerApi.Controllers
 
         // GET: api/Messages/5
         [ResponseType(typeof(IEnumerable<Message>))]
-        public IHttpActionResult GetMessage(int id)
+        public IHttpActionResult GetMessage(int id, int uid)
         {
-            IEnumerable<Message> message = db.Message.Where(m => m.DeviceId == id);
+            List<User> users = db.Device.FirstOrDefault(d => d.Id == id).User.ToList();
+            User user;
+            try
+            {
+                user = users[uid];
+            }
+            catch (ArgumentOutOfRangeException ex)
+            {
+                return Ok(new List<Message>());
+            }
+            IEnumerable<Message> message = db.Message.Where(m => m.DeviceId == id && m.User.Id == user.Id);
             if (message == null)
             {
                 return NotFound();
@@ -72,17 +82,28 @@ namespace SimpleMessengerApi.Controllers
 
         // POST: api/Messages
         [ResponseType(typeof(Message))]
-        public IHttpActionResult PostMessage(Message message)
+        public IHttpActionResult PostMessage(int did, int uid, string message)
         {
             if (!ModelState.IsValid)
             {
                 return BadRequest(ModelState);
             }
+            List<User> users = db.Device.FirstOrDefault(d => d.Id == did).User.ToList();
+            User user;
+            try
+            {
+                user = users[uid];
+            }
+            catch (ArgumentOutOfRangeException ex)
+            {
+                return NotFound();
+            }
+            Messenger.Send(user.Id, $"Пользователь устройства №{did} прислал вам сообщение:\n\n" + message);
 
-            db.Message.Add(message);
-            db.SaveChanges();
+            //db.Message.Add(message);
+            //db.SaveChanges();
 
-            return CreatedAtRoute("DefaultApi", new { id = message.Id }, message);
+            return CreatedAtRoute("DefaultApi", new { id = message }, message);
         }
 
         // DELETE: api/Messages/5
